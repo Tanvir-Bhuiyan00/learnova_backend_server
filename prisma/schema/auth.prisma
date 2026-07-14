@@ -11,9 +11,12 @@ model User {
     image              String?
     createdAt          DateTime   @default(now())
     updatedAt          DateTime   @updatedAt
-    sessions           Session[]
-    accounts           Account[]
-    student            Student?
+
+    sessions   Session[]
+    accounts   Account[]
+    student    Student?
+    instructor Instructor?
+    admin      Admin?
 
     @@unique([email])
     @@map("users")

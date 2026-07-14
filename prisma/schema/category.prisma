@@ -11,6 +11,8 @@ model Category {
     isDeleted Boolean   @default(false)
     deletedAt DateTime?
 
+    courses Course[]
+
     @@index([isDeleted], name: "idx_category_isDeleted")
     @@index([title], name: "idx_category_title")
     @@map("categories")

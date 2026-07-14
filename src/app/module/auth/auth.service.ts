@@ -1,5 +1,6 @@
 import { UserStatus } from "../../../generated/prisma/enums";
 import { auth } from "../../lib/auth";
+import { prisma } from "../../lib/prisma";
 
 interface IRegisterUserPayload {
   name: string;
@@ -25,13 +26,54 @@ const registerUser = async (payload: IRegisterUserPayload) => {
     throw new Error("Failed to register user");
   }
 
-  //TODO : Create Student Profile In Transaction After Sign Up Of Student In USer Model
-  // const student = await prisma.$transaction( async (tx) => {
+  try {
+    const student = await prisma.$transaction(async (tx) => {
+      const studentTx = await tx.student.create({
+        data: {
+          userId: data.user.id,
+          name: payload.name,
+          email: payload.email,
+        },
+      });
 
-  //     await tx.pa
-  // })
+      return studentTx;
+    });
 
-  return data;
+    const accessToken = tokenUtils.getAccessToken({
+      userId: data.user.id,
+      role: data.user.role,
+      name: data.user.name,
+      email: data.user.email,
+      status: data.user.status,
+      isDeleted: data.user.isDeleted,
+      emailVerified: data.user.emailVerified,
+    });
+
+    const refreshToken = tokenUtils.getRefreshToken({
+      userId: data.user.id,
+      role: data.user.role,
+      name: data.user.name,
+      email: data.user.email,
+      status: data.user.status,
+      isDeleted: data.user.isDeleted,
+      emailVerified: data.user.emailVerified,
+    });
+
+    return {
+      ...data,
+      accessToken,
+      refreshToken,
+      student,
+    };
+  } catch (error) {
+    console.log("Transaction error : ", error);
+    await prisma.user.delete({
+      where: {
+        id: data.user.id,
+      },
+    });
+    throw error;
+  }
 };
 
 interface ILoginUserPayload {
