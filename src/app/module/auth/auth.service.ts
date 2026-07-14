@@ -1,14 +1,15 @@
 import { UserStatus } from "../../../generated/prisma/enums";
 import { auth } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
+import { tokenUtils } from "../../utils/token";
 
-interface IRegisterUserPayload {
+interface IRegisterStudentPayload {
   name: string;
   email: string;
   password: string;
 }
 
-const registerUser = async (payload: IRegisterUserPayload) => {
+const registerStudent = async (payload: IRegisterStudentPayload) => {
   const { name, email, password } = payload;
 
   const data = await auth.api.signUpEmail({
@@ -23,7 +24,7 @@ const registerUser = async (payload: IRegisterUserPayload) => {
   });
 
   if (!data.user) {
-    throw new Error("Failed to register user");
+    throw new Error("Failed to register student");
   }
 
   try {
@@ -76,12 +77,12 @@ const registerUser = async (payload: IRegisterUserPayload) => {
   }
 };
 
-interface ILoginUserPayload {
+interface ILoginStudentPayload {
   email: string;
   password: string;
 }
 
-const loginUser = async (payload: ILoginUserPayload) => {
+const loginStudent = async (payload: ILoginStudentPayload) => {
   const { email, password } = payload;
 
   const data = await auth.api.signInEmail({
@@ -92,17 +93,17 @@ const loginUser = async (payload: ILoginUserPayload) => {
   });
 
   if (data.user.status === UserStatus.BLOCKED) {
-    throw new Error("User is blocked");
+    throw new Error("Student is blocked");
   }
 
   if (data.user.isDeleted || data.user.status === UserStatus.DELETED) {
-    throw new Error("User is deleted");
+    throw new Error("Student is deleted");
   }
 
   return data;
 };
 
 export const AuthService = {
-  registerUser,
-  loginUser,
+  registerStudent,
+  loginStudent,
 };

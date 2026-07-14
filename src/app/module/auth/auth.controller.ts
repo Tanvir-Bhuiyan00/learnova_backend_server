@@ -4,33 +4,33 @@ import { sendResponse } from "../../shared/sendResponse";
 import { AuthService } from "./auth.service";
 import status from "http-status";
 
-const registerUser = catchAsync(async (req: Request, res: Response) => {
+const registerStudent = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
 
   console.log(payload);
 
-  const result = await AuthService.registerUser(payload);
+  const result = await AuthService.registerStudent(payload);
 
   sendResponse(res, {
     httpStatusCode: status.CREATED,
     success: true,
-    message: "User registered successfully",
+    message: "Student registered successfully",
     data: result,
   });
 });
 
-const loginUser = catchAsync(async (req: Request, res: Response) => {
+const loginStudent = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
-  const result = await AuthService.loginUser(payload);
+  const result = await AuthService.loginStudent(payload);
   sendResponse(res, {
     httpStatusCode: status.OK,
     success: true,
-    message: "User logged in successfully",
+    message: "Student logged in successfully",
     data: result,
   });
 });
 
 export const AuthController = {
-  registerUser,
-  loginUser,
+  registerStudent,
+  loginStudent,
 };
