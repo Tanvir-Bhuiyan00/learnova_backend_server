@@ -1,172 +1,115 @@
-import { Prisma } from "../../../generated/prisma/client";
 import status from "http-status";
+import { Instructor, Prisma } from "../../../generated/prisma/client";
+import { UserStatus } from "../../../generated/prisma/enums";
 import AppError from "../../errorHelpers/AppError";
+import { IQueryParams } from "../../interfaces/query.interface";
 import { prisma } from "../../lib/prisma";
+import { QueryBuilder } from "../../utils/QueryBuilder";
+import {
+  instructorFilterableFields,
+  instructorSearchableFields,
+} from "./instructor.constant";
 import { IUpdateInstructorPayload } from "./instructor.interface";
 
-const getAllInstructors = async (query: {
-    page?: number;
-    limit?: number;
-    searchTerm?: string;
-    sortBy?: string;
-    sortOrder?: "asc" | "desc";
-}) => {
-    const { page = 1, limit = 10, searchTerm, sortBy = "createdAt", sortOrder = "desc" } = query;
+const getAllInstructors = async (query: IQueryParams) => {
+  const queryBuilder = new QueryBuilder<
+    Instructor,
+    Prisma.InstructorWhereInput,
+    Prisma.InstructorInclude
+  >(prisma.instructor, query, {
+    searchableFields: instructorSearchableFields,
+    filterableFields: instructorFilterableFields,
+  });
 
-    const skip = (page - 1) * limit;
+  const result = await queryBuilder
+    .search()
+    .filter()
+    .where({
+      isDeleted: false,
+    })
+    .include({
+      user: true,
+    })
+    .dynamicInclude({})
+    .paginate()
+    .sort()
+    .fields()
+    .execute();
 
-    const andConditions: Prisma.InstructorWhereInput[] = [{ isDeleted: false }];
-
-    if (searchTerm) {
-        andConditions.push({
-            OR: [
-                { name: { contains: searchTerm, mode: "insensitive" } },
-                { email: { contains: searchTerm, mode: "insensitive" } },
-                { designation: { contains: searchTerm, mode: "insensitive" } },
-                { currentWorkingPlace: { contains: searchTerm, mode: "insensitive" } },
-            ],
-        });
-    }
-
-    const where: Prisma.InstructorWhereInput = { AND: andConditions };
-
-    const [instructors, total] = await Promise.all([
-        prisma.instructor.findMany({
-            where,
-            skip,
-            take: limit,
-            orderBy: { [sortBy]: sortOrder },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        email: true,
-                        role: true,
-                        status: true,
-                        profilePhoto: true,
-                    },
-                },
-                _count: {
-                    select: { courses: true, reviews: true },
-                },
-            },
-        }),
-        prisma.instructor.count({ where }),
-    ]);
-
-    return {
-        data: instructors,
-        meta: {
-            page,
-            limit,
-            total,
-            totalPage: Math.ceil(total / limit),
-        },
-    };
+  return result;
 };
 
 const getInstructorById = async (id: string) => {
-    const instructor = await prisma.instructor.findUnique({
-        where: { id, isDeleted: false },
-        include: {
-            user: {
-                select: {
-                    id: true,
-                    email: true,
-                    role: true,
-                    status: true,
-                    profilePhoto: true,
-                },
-            },
-            courses: {
-                where: { isDeleted: false },
-                select: {
-                    id: true,
-                    title: true,
-                    price: true,
-                    level: true,
-                    status: true,
-                    thumbnail: true,
-                    averageRating: true,
-                    totalStudents: true,
-                },
-            },
-            _count: {
-                select: { courses: true, reviews: true },
-            },
-        },
-    });
-
-    if (!instructor) {
-        throw new AppError(status.NOT_FOUND, "Instructor not found");
-    }
-
-    return instructor;
+  const instructor = await prisma.instructor.findUnique({
+    where: {
+      id,
+      isDeleted: false,
+    },
+    include: {
+      user: true,
+      courses: true,
+      reviews: true,
+    },
+  });
+  return instructor;
 };
 
 const updateInstructor = async (id: string, payload: IUpdateInstructorPayload) => {
-    const instructor = await prisma.instructor.findUnique({
-        where: { id, isDeleted: false },
-    });
+  const isInstructorExist = await prisma.instructor.findUnique({
+    where: { id },
+  });
 
-    if (!instructor) {
-        throw new AppError(status.NOT_FOUND, "Instructor not found");
-    }
+  if (!isInstructorExist) {
+    throw new AppError(status.NOT_FOUND, "Instructor not found");
+  }
 
-    const result = await prisma.instructor.update({
-        where: { id },
-        data: payload,
-        include: {
-            user: {
-                select: {
-                    id: true,
-                    email: true,
-                    role: true,
-                    status: true,
-                    profilePhoto: true,
-                },
-            },
-        },
-    });
+  const updatedInstructor = await prisma.instructor.update({
+    where: { id },
+    data: payload,
+  });
 
-    return result;
+  return updatedInstructor;
 };
 
-const softDeleteInstructor = async (id: string) => {
-    const instructor = await prisma.instructor.findUnique({
-        where: { id, isDeleted: false },
+const deleteInstructor = async (id: string) => {
+  const isInstructorExist = await prisma.instructor.findUnique({
+    where: { id },
+    include: { user: true },
+  });
+
+  if (!isInstructorExist) {
+    throw new AppError(status.NOT_FOUND, "Instructor not found");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.instructor.update({
+      where: { id },
+      data: {
+        isDeleted: true,
+        deletedAt: new Date(),
+      },
     });
 
-    if (!instructor) {
-        throw new AppError(status.NOT_FOUND, "Instructor not found");
-    }
-
-    const result = await prisma.$transaction(async (tx) => {
-        const deletedInstructor = await tx.instructor.update({
-            where: { id },
-            data: {
-                isDeleted: true,
-                deletedAt: new Date(),
-            },
-        });
-
-        await tx.user.update({
-            where: { id: instructor.userId },
-            data: {
-                isDeleted: true,
-                status: "DELETED",
-            },
-        });
-
-        return deletedInstructor;
+    await tx.user.update({
+      where: { id: isInstructorExist.userId },
+      data: {
+        isDeleted: true,
+        deletedAt: new Date(),
+        status: UserStatus.DELETED,
+      },
     });
 
-    return result;
+    await tx.session.deleteMany({
+      where: { userId: isInstructorExist.userId },
+    });
+  });
+
+  return { message: "Instructor deleted successfully" };
 };
 
 export const InstructorService = {
-    getAllInstructors,
-    getInstructorById,
-    updateInstructor,
-    softDeleteInstructor,
+  getAllInstructors,
+  getInstructorById,
+  updateInstructor,
+  deleteInstructor,
 };

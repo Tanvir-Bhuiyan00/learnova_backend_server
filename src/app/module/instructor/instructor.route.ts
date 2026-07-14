@@ -7,17 +7,24 @@ import { updateInstructorZodSchema } from "./instructor.validation";
 
 const router = Router();
 
-router.get("/", checkAuth(UserRole.STUDENT, UserRole.INSTRUCTOR, UserRole.ADMIN, UserRole.SUPER_ADMIN), InstructorController.getAllInstructors);
-
-router.get("/:id", checkAuth(UserRole.STUDENT, UserRole.INSTRUCTOR, UserRole.ADMIN, UserRole.SUPER_ADMIN), InstructorController.getInstructorById);
-
-router.patch(
-    "/:id",
-    checkAuth(UserRole.INSTRUCTOR, UserRole.ADMIN, UserRole.SUPER_ADMIN),
-    validateRequest(updateInstructorZodSchema),
-    InstructorController.updateInstructor,
+router.get(
+  "/",
+  InstructorController.getAllInstructors,
 );
-
-router.delete("/:id", checkAuth(UserRole.ADMIN, UserRole.SUPER_ADMIN), InstructorController.softDeleteInstructor);
+router.get(
+  "/:id",
+  InstructorController.getInstructorById,
+);
+router.patch(
+  "/:id",
+  checkAuth(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INSTRUCTOR),
+  validateRequest(updateInstructorZodSchema),
+  InstructorController.updateInstructor,
+);
+router.delete(
+  "/:id",
+  checkAuth(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  InstructorController.deleteInstructor,
+);
 
 export const InstructorRoutes = router;

@@ -421,6 +421,9 @@ importers:
       pg:
         specifier: ^8.22.0
         version: 8.22.0
+      qs:
+        specifier: ^6.15.3
+        version: 6.15.3
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -458,6 +461,9 @@ importers:
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0
+      '@types/qs':
+        specifier: ^6.15.1
+        version: 6.15.1
       eslint:
         specifier: ^10.7.0
         version: 10.7.0(jiti@2.7.0)
