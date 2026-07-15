@@ -3,7 +3,8 @@ model Payment {
 
     amount                Float         @default(0.0)
     currency              String        @default("BDT") @db.VarChar(3)
-    stripePaymentIntentId String        @unique @db.VarChar(255)
+    stripePaymentIntentId String?       @db.VarChar(255)
+    paymentGatewayData    Json?
     status                PaymentStatus @default(PENDING)
     isDeleted             Boolean       @default(false)
     deletedAt             DateTime?

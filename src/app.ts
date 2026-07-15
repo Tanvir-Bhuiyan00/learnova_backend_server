@@ -9,12 +9,21 @@ import { envVars } from "./app/config/env";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./app/lib/auth";
 import qs from "qs";
+import cron from "node-cron";
+import { PaymentController } from "./app/module/payment/payment.controller";
+import { EnrollmentService } from "./app/module/enrollment/enrollment.service";
 
 const app: Application = express();
 app.set("query parser", (str: string) => qs.parse(str));
 
 app.set("view engine", "ejs");
 app.set("views", path.resolve(process.cwd(), `src/app/templates`));
+
+app.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  PaymentController.handleStripeWebhookEvent,
+);
 
 app.use(
   cors({
@@ -39,6 +48,18 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
+
+cron.schedule("*/25 * * * *", async () => {
+  try {
+    console.log("Running cron job to cancel unpaid enrollments...");
+    await EnrollmentService.cancelUnpaidEnrollments();
+  } catch (error: any) {
+    console.error(
+      "Error occurred while canceling unpaid enrollments:",
+      error.message,
+    );
+  }
+});
 
 app.use("/api/v1", IndexRoutes);
 
