@@ -1,7 +1,6 @@
 import status from "http-status";
 import { CourseStatus, PaymentStatus } from "../../../generated/prisma/enums";
 import { envVars } from "../../config/env";
-import { stripe } from "../../config/stripe.config";
 import AppError from "../../errorHelpers/AppError";
 import { IRequestUser } from "../../interfaces/requestUser.interface";
 import { prisma } from "../../lib/prisma";
@@ -11,6 +10,7 @@ import {
   enrollmentFilterableFields,
   enrollmentSearchableFields,
 } from "./enrollment.constant";
+import { stripe } from "../../config/stripe.config";
 
 const checkoutCart = async (user: IRequestUser) => {
   const student = await prisma.student.findUnique({
@@ -38,7 +38,10 @@ const checkoutCart = async (user: IRequestUser) => {
   }
 
   for (const item of cart.items) {
-    if (item.course.isDeleted || item.course.status !== CourseStatus.PUBLISHED) {
+    if (
+      item.course.isDeleted ||
+      item.course.status !== CourseStatus.PUBLISHED
+    ) {
       throw new AppError(
         status.BAD_REQUEST,
         `Course "${item.course.title}" is not available for enrollment`,
@@ -229,7 +232,10 @@ const getMyEnrollments = async (user: IRequestUser) => {
   return enrollments;
 };
 
-const getSingleEnrollment = async (enrollmentId: string, user: IRequestUser) => {
+const getSingleEnrollment = async (
+  enrollmentId: string,
+  user: IRequestUser,
+) => {
   const student = await prisma.student.findUnique({
     where: { userId: user.userId },
   });
@@ -374,7 +380,11 @@ function calculateCartTotals(
     discount = Math.min(discount, subtotal);
   }
 
-  return { subtotal, discount: Math.round(discount * 100) / 100, total: Math.max(0, subtotal - discount) };
+  return {
+    subtotal,
+    discount: Math.round(discount * 100) / 100,
+    total: Math.max(0, subtotal - discount),
+  };
 }
 
 function calculateItemDiscount(
