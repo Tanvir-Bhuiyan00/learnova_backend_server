@@ -1,26 +1,62 @@
 import status from "http-status";
-import { UserStatus } from "../../../generated/prisma/enums";
+import { UserRole, UserStatus } from "../../../generated/prisma/enums";
 import AppError from "../../errorHelpers/AppError";
 import { IRequestUser } from "../../interfaces/requestUser.interface";
+import { IQueryParams } from "../../interfaces/query.interface";
 import { prisma } from "../../lib/prisma";
-import { IUpdateAdminPayload } from "./admin.interface";
+import { QueryBuilder } from "../../utils/QueryBuilder";
+import {
+  adminFilterableFields,
+  adminSearchableFields,
+} from "./admin.constant";
+import {
+  IChangeUserRolePayload,
+  IChangeUserStatusPayload,
+  IUpdateAdminPayload,
+} from "./admin.interface";
 
-const getAllAdmins = async () => {
-  const admins = await prisma.admin.findMany({
-    include: {
-      user: true,
-    },
+const getAllAdmins = async (query: IQueryParams) => {
+  const queryBuilder = new QueryBuilder(prisma.admin, query, {
+    searchableFields: adminSearchableFields,
+    filterableFields: adminFilterableFields,
   });
-  return admins;
+
+  const result = await queryBuilder
+    .where({ isDeleted: false } as any)
+    .search()
+    .filter()
+    .include({
+      user: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          isDeleted: true,
+        },
+      },
+    } as any)
+    .paginate()
+    .sort()
+    .fields()
+    .execute();
+
+  return result;
 };
 
 const getAdminById = async (id: string) => {
   const admin = await prisma.admin.findUnique({
-    where: {
-      id,
-    },
+    where: { id, isDeleted: false },
     include: {
-      user: true,
+      user: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          isDeleted: true,
+        },
+      },
     },
   });
   return admin;
@@ -28,19 +64,15 @@ const getAdminById = async (id: string) => {
 
 const updateAdmin = async (id: string, payload: IUpdateAdminPayload) => {
   const isAdminExist = await prisma.admin.findUnique({
-    where: {
-      id,
-    },
+    where: { id },
   });
 
   if (!isAdminExist) {
-    throw new AppError(status.NOT_FOUND, "Admin Or Super Admin not found");
+    throw new AppError(status.NOT_FOUND, "Admin not found");
   }
 
   const updatedAdmin = await prisma.admin.update({
-    where: {
-      id,
-    },
+    where: { id },
     data: payload,
   });
 
@@ -48,19 +80,15 @@ const updateAdmin = async (id: string, payload: IUpdateAdminPayload) => {
 };
 
 const deleteAdmin = async (id: string, user: IRequestUser) => {
-  //TODO: Validate who is deleting the admin user. Only super admin can delete admin user and only super admin can delete super admin user but admin user cannot delete super admin user
-
   const isAdminExist = await prisma.admin.findUnique({
-    where: {
-      id,
-    },
+    where: { id },
   });
 
   if (!isAdminExist) {
-    throw new AppError(status.NOT_FOUND, "Admin Or Super Admin not found");
+    throw new AppError(status.NOT_FOUND, "Admin not found");
   }
 
-  if (isAdminExist.id === user.userId) {
+  if (isAdminExist.userId === user.userId) {
     throw new AppError(status.BAD_REQUEST, "You cannot delete yourself");
   }
 
@@ -78,7 +106,7 @@ const deleteAdmin = async (id: string, user: IRequestUser) => {
       data: {
         isDeleted: true,
         deletedAt: new Date(),
-        status: UserStatus.DELETED, // Optional: you may also want to block the user
+        status: UserStatus.DELETED,
       },
     });
 
@@ -98,9 +126,100 @@ const deleteAdmin = async (id: string, user: IRequestUser) => {
   return result;
 };
 
+const changeUserStatus = async (
+  user: IRequestUser,
+  payload: IChangeUserStatusPayload,
+) => {
+  const isAdminExists = await prisma.admin.findUniqueOrThrow({
+    where: {
+      email: user.email,
+    },
+    include: {
+      user: true,
+    },
+  });
+
+  const { userId, userStatus } = payload;
+
+  const userToChangeStatus = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+  });
+
+  const selfStatusChange = isAdminExists.userId === userId;
+
+  if (selfStatusChange) {
+    throw new AppError(status.BAD_REQUEST, "You cannot change your own status");
+  }
+
+  if (
+    isAdminExists.user.role === UserRole.ADMIN &&
+    userToChangeStatus.role === UserRole.SUPER_ADMIN
+  ) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      "You cannot change the status of super admin. Only super admin can change the status of another super admin",
+    );
+  }
+
+  if (
+    isAdminExists.user.role === UserRole.ADMIN &&
+    userToChangeStatus.role === UserRole.ADMIN
+  ) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      "You cannot change the status of another admin. Only super admin can change the status of another admin",
+    );
+  }
+
+  if (userStatus === UserStatus.DELETED) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      "You cannot set user status to deleted. To delete a user, use the role-specific delete API",
+    );
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: { status: userStatus },
+  });
+
+  return updatedUser;
+};
+
+const changeUserRole = async (
+  user: IRequestUser,
+  payload: IChangeUserRolePayload,
+) => {
+  const isSuperAdmin = await prisma.user.findFirstOrThrow({
+    where: {
+      id: user.userId,
+      role: UserRole.SUPER_ADMIN,
+    },
+  });
+
+  const { userId, role } = payload;
+
+  const userToChangeRole = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+  });
+
+  if (isSuperAdmin.id === userId) {
+    throw new AppError(status.BAD_REQUEST, "You cannot change your own role");
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: { role },
+  });
+
+  return updatedUser;
+};
+
 export const AdminService = {
   getAllAdmins,
   getAdminById,
   updateAdmin,
   deleteAdmin,
+  changeUserStatus,
+  changeUserRole,
 };

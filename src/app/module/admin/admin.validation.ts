@@ -1,11 +1,19 @@
+import { UserRole, UserStatus } from "../../../generated/prisma/enums";
 import z from "zod";
 
 export const updateAdminZodSchema = z.object({
-  name: z.string("Name must be a string").optional(),
-  profilePhoto: z.url("Profile photo must be a valid URL").optional(),
-  contactNumber: z
-    .string("Contact number must be a string")
-    .min(11, "Contact number must be at least 11 characters")
-    .max(14, "Contact number must be at most 15 characters")
-    .optional(),
+  name: z.string().optional(),
+  profilePhoto: z.string().optional(),
+  contactNumber: z.string().min(11).max(14).optional(),
+  address: z.string().optional(),
+});
+
+export const changeUserStatusZodSchema = z.object({
+  userId: z.string(),
+  userStatus: z.nativeEnum(UserStatus),
+});
+
+export const changeUserRoleZodSchema = z.object({
+  userId: z.string(),
+  role: z.nativeEnum(UserRole),
 });

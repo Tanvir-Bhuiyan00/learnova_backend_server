@@ -3,7 +3,11 @@ import { UserRole } from "../../../generated/prisma/enums";
 import { checkAuth } from "../../middleware/checkAuth";
 import { validateRequest } from "../../middleware/validateRequest";
 import { AdminController } from "./admin.controller";
-import { updateAdminZodSchema } from "./admin.validation";
+import {
+  changeUserRoleZodSchema,
+  changeUserStatusZodSchema,
+  updateAdminZodSchema,
+} from "./admin.validation";
 
 const router = Router();
 
@@ -23,6 +27,23 @@ router.patch(
   validateRequest(updateAdminZodSchema),
   AdminController.updateAdmin,
 );
-router.delete("/:id", checkAuth(UserRole.SUPER_ADMIN), AdminController.deleteAdmin);
+router.delete(
+  "/:id",
+  checkAuth(UserRole.SUPER_ADMIN),
+  AdminController.deleteAdmin,
+);
+
+router.patch(
+  "/change-user-status",
+  checkAuth(UserRole.SUPER_ADMIN, UserRole.ADMIN),
+  validateRequest(changeUserStatusZodSchema),
+  AdminController.changeUserStatus,
+);
+router.patch(
+  "/change-user-role",
+  checkAuth(UserRole.SUPER_ADMIN),
+  validateRequest(changeUserRoleZodSchema),
+  AdminController.changeUserRole,
+);
 
 export const AdminRoutes = router;

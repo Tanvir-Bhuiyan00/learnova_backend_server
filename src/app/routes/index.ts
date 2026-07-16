@@ -8,6 +8,7 @@ import { EnrollmentRoutes } from "../module/enrollment/enrollment.route";
 import { InstructorRoutes } from "../module/instructor/instructor.route";
 import { PaymentRoutes } from "../module/payment/payment.route";
 import { ReviewRoutes } from "../module/review/review.route";
+import { StatsRoutes } from "../module/stats/stats.route";
 import { StudentRoutes } from "../module/student/student.route";
 import { UserRoutes } from "../module/user/user.route";
 
@@ -24,5 +25,6 @@ router.use("/enrollments", EnrollmentRoutes);
 router.use("/payments", PaymentRoutes);
 router.use("/reviews", ReviewRoutes);
 router.use("/students", StudentRoutes);
+router.use("/stats", StatsRoutes);
 
 export const IndexRoutes = router;

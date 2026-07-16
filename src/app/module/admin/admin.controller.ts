@@ -1,23 +1,25 @@
 import { Request, Response } from "express";
 import status from "http-status";
+import { IQueryParams } from "../../interfaces/query.interface";
 import { catchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
 import { AdminService } from "./admin.service";
 
 const getAllAdmins = catchAsync(async (req: Request, res: Response) => {
-  const result = await AdminService.getAllAdmins();
+  const query = req.query;
+  const result = await AdminService.getAllAdmins(query as IQueryParams);
 
   sendResponse(res, {
     httpStatusCode: status.OK,
     success: true,
     message: "Admins fetched successfully",
-    data: result,
+    data: result.data,
+    meta: result.meta,
   });
 });
 
 const getAdminById = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-
   const admin = await AdminService.getAdminById(id as string);
 
   sendResponse(res, {
@@ -56,9 +58,37 @@ const deleteAdmin = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const changeUserStatus = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user;
+  const payload = req.body;
+  const result = await AdminService.changeUserStatus(user, payload);
+
+  sendResponse(res, {
+    httpStatusCode: status.OK,
+    success: true,
+    message: "User status changed successfully",
+    data: result,
+  });
+});
+
+const changeUserRole = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user;
+  const payload = req.body;
+  const result = await AdminService.changeUserRole(user, payload);
+
+  sendResponse(res, {
+    httpStatusCode: status.OK,
+    success: true,
+    message: "User role changed successfully",
+    data: result,
+  });
+});
+
 export const AdminController = {
   getAllAdmins,
   updateAdmin,
   deleteAdmin,
   getAdminById,
+  changeUserStatus,
+  changeUserRole,
 };
