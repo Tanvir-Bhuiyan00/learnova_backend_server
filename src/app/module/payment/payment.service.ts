@@ -1,149 +1,162 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import Stripe from "stripe";
-import status from "http-status";
 import { PaymentStatus } from "../../../generated/prisma/enums";
-import AppError from "../../errorHelpers/AppError";
-import { IQueryParams } from "../../interfaces/query.interface";
+import { uploadFileToCloudinary } from "../../config/cloudinary.config";
 import { IRequestUser } from "../../interfaces/requestUser.interface";
+import { IQueryParams } from "../../interfaces/query.interface";
 import { prisma } from "../../lib/prisma";
 import { QueryBuilder } from "../../utils/QueryBuilder";
-import {
-  paymentFilterableFields,
-  paymentSearchableFields,
-} from "./payment.constant";
+import { sendEmail } from "../../utils/email";
+import { paymentFilterableFields, paymentSearchableFields } from "./payment.constant";
+import { generateInvoicePdf } from "./payment.utils";
 
 const handlerStripeWebhookEvent = async (event: Stripe.Event) => {
+  const existingPayment = await prisma.payment.findFirst({
+    where: { stripeEventId: event.id },
+  });
+
+  if (existingPayment) {
+    return { message: `Event ${event.id} already processed. Skipping` };
+  }
+
   switch (event.type) {
     case "checkout.session.completed": {
-      const session = event.data.object as Stripe.Checkout.Session;
+      const session = event.data.object as any;
+
       const studentId = session.metadata?.studentId;
       const enrollmentIdsRaw = session.metadata?.enrollmentIds;
 
       if (!studentId || !enrollmentIdsRaw) {
-        console.error("Missing studentId or enrollmentIds in session metadata");
-        return { message: "Missing studentId or enrollmentIds in session metadata" };
+        console.error("Missing metadata in webhook event");
+        return { message: "Missing metadata" };
       }
 
       const enrollmentIds = enrollmentIdsRaw.split(",");
 
-      const payments = await prisma.payment.findMany({
-        where: {
-          enrollmentId: { in: enrollmentIds },
-          studentId,
+      const enrollments = await prisma.enrollment.findMany({
+        where: { id: { in: enrollmentIds } },
+        include: {
+          student: true,
+          course: { include: { instructor: true } },
+          payment: true,
         },
-        include: { coupon: true },
       });
 
-      if (payments.length === 0) {
-        console.error("No payments found for enrollmentIds:", enrollmentIds);
-        return { message: "No payments found" };
+      if (enrollments.length === 0) {
+        console.error("No enrollments found for the given IDs");
+        return { message: "Enrollments not found" };
       }
 
-      const alreadyProcessed = payments.every(
-        (p) => p.status === PaymentStatus.SUCCEEDED,
-      );
-      if (alreadyProcessed) {
-        console.log(`Session ${session.id} already processed. Skipping.`);
-        return { message: `Session ${session.id} already processed. Skipping` };
-      }
+      const isPaid = session.payment_status === "paid";
 
-      const paymentIntentId = session.payment_intent as string;
-      const paymentGatewayData = session as any;
+      const result = await prisma.$transaction(async (tx) => {
+        const updatedPayments = [];
 
-      await prisma.$transaction(async (tx) => {
-        for (const payment of payments) {
-          await tx.payment.update({
-            where: { id: payment.id },
+        for (const enrollment of enrollments) {
+          const updatedPayment = await tx.payment.update({
+            where: { id: enrollment.payment!.id },
             data: {
-              stripePaymentIntentId: paymentIntentId,
-              paymentGatewayData,
-              status:
-                session.payment_status === "paid"
-                  ? PaymentStatus.SUCCEEDED
-                  : PaymentStatus.FAILED,
+              status: isPaid ? PaymentStatus.SUCCEEDED : PaymentStatus.FAILED,
+              stripePaymentIntentId: session.payment_intent,
+              paymentGatewayData: session,
+              stripeEventId: event.id,
             },
           });
 
-          if (
-            session.payment_status === "paid" &&
-            payment.coupon
-          ) {
-            await tx.coupon.update({
-              where: { id: payment.coupon.id },
-              data: { usedCount: { increment: 1 } },
+          updatedPayments.push(updatedPayment);
+        }
+
+        return updatedPayments;
+      });
+
+      if (isPaid) {
+        for (const enrollment of enrollments) {
+          try {
+            const pdfBuffer = await generateInvoicePdf({
+              invoiceId: enrollment.payment!.id,
+              studentName: enrollment.student.name,
+              studentEmail: enrollment.student.email,
+              courseName: enrollment.course.title,
+              instructorName: enrollment.course.instructor?.name || "N/A",
+              amount: enrollment.payment?.amount || 0,
+              transactionId: enrollment.payment?.id || "",
+              paymentDate: new Date().toISOString(),
             });
+
+            const cloudinaryResponse = await uploadFileToCloudinary(
+              pdfBuffer,
+              `learnova/invoices/invoice-${enrollment.payment!.id}-${Date.now()}.pdf`,
+            );
+
+            const invoiceUrl = cloudinaryResponse?.secure_url;
+
+            if (invoiceUrl) {
+              await prisma.payment.update({
+                where: { id: enrollment.payment!.id },
+                data: { invoiceUrl },
+              });
+            }
+
+            await sendEmail({
+              to: enrollment.student.email,
+              subject: `Payment Confirmation & Invoice - ${enrollment.course.title}`,
+              templateName: "invoice",
+              templateData: {
+                studentName: enrollment.student.name,
+                invoiceId: enrollment.payment!.id,
+                transactionId: enrollment.payment!.id,
+                paymentDate: new Date().toLocaleDateString(),
+                courseName: enrollment.course.title,
+                instructorName: enrollment.course.instructor?.name || "N/A",
+                amount: enrollment.payment?.amount || 0,
+                invoiceUrl: invoiceUrl || "",
+              },
+              attachments: [
+                {
+                  filename: `Invoice-${enrollment.payment!.id}.pdf`,
+                  content: pdfBuffer || Buffer.from(""),
+                  contentType: "application/pdf",
+                },
+              ],
+            });
+          } catch (err) {
+            console.error("Error processing invoice for enrollment:", enrollment.id, err);
           }
         }
-      });
+      }
 
-      console.log(
-        `Processed checkout.session.completed for enrollments: ${enrollmentIdsRaw}`,
-      );
       break;
     }
-    case "checkout.session.expired": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const studentId = session.metadata?.studentId;
+
+    case "checkout.session.expired":
+    case "payment_intent.payment_failed": {
+      const session = event.data.object as any;
       const enrollmentIdsRaw = session.metadata?.enrollmentIds;
 
-      if (studentId && enrollmentIdsRaw) {
+      if (enrollmentIdsRaw) {
         const enrollmentIds = enrollmentIdsRaw.split(",");
-
-        await prisma.$transaction(async (tx) => {
-          await tx.payment.updateMany({
-            where: {
-              enrollmentId: { in: enrollmentIds },
-              studentId,
-              status: PaymentStatus.PENDING,
-            },
-            data: {
-              status: PaymentStatus.FAILED,
-            },
-          });
-
-          await tx.enrollment.updateMany({
-            where: { id: { in: enrollmentIds } },
-            data: { isDeleted: true, deletedAt: new Date() },
-          });
+        await prisma.payment.updateMany({
+          where: { enrollmentId: { in: enrollmentIds } },
+          data: { status: PaymentStatus.FAILED },
         });
       }
 
-      console.log(`Checkout session ${session.id} expired. Payments marked as failed.`);
       break;
     }
-    case "payment_intent.payment_failed": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
 
-      await prisma.payment.updateMany({
-        where: {
-          stripePaymentIntentId: paymentIntent.id,
-          status: PaymentStatus.PENDING,
-        },
-        data: {
-          status: PaymentStatus.FAILED,
-        },
-      });
-
-      console.log(`Payment intent ${paymentIntent.id} failed.`);
-      break;
-    }
     default:
       console.log(`Unhandled event type ${event.type}`);
   }
 
-  return { message: `Webhook event ${event.id} processed successfully` };
+  return { message: `Webhook Event ${event.id} processed successfully` };
 };
 
 const getMyPayments = async (user: IRequestUser) => {
-  const student = await prisma.student.findUnique({
+  const student = await prisma.student.findUniqueOrThrow({
     where: { userId: user.userId },
   });
 
-  if (!student) {
-    throw new AppError(status.NOT_FOUND, "Student profile not found");
-  }
-
-  const payments = await prisma.payment.findMany({
+  return await prisma.payment.findMany({
     where: { studentId: student.id, isDeleted: false },
     include: {
       enrollment: {
@@ -157,18 +170,9 @@ const getMyPayments = async (user: IRequestUser) => {
           },
         },
       },
-      coupon: {
-        select: {
-          code: true,
-          discountType: true,
-          discountValue: true,
-        },
-      },
     },
     orderBy: { createdAt: "desc" },
   });
-
-  return payments;
 };
 
 const getAllPayments = async (query: IQueryParams) => {
@@ -187,23 +191,18 @@ const getAllPayments = async (query: IQueryParams) => {
           id: true,
           name: true,
           email: true,
+          profilePhoto: true,
         },
       },
       enrollment: {
-        include: {
+        select: {
+          id: true,
           course: {
             select: {
               id: true,
               title: true,
             },
           },
-        },
-      },
-      coupon: {
-        select: {
-          code: true,
-          discountType: true,
-          discountValue: true,
         },
       },
     } as any)
