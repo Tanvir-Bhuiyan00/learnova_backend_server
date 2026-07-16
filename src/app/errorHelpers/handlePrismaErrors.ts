@@ -217,9 +217,7 @@ export const handlerPrismaClientInitializationError = (
     ? getStatusCodeFromPrismaError(error.errorCode)
     : status.SERVICE_UNAVAILABLE;
 
-  const cleanMessage = error.message;
-
-  cleanMessage.replace(/Invalid `.*?` invocation:?\s*/i, "");
+  const cleanMessage = error.message.replace(/Invalid `.*?` invocation:?\s*/i, "");
 
   const lines = cleanMessage.split("\n").filter((line) => line.trim());
 

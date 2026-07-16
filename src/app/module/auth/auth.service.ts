@@ -10,6 +10,7 @@ import { jwtUtils } from "../../utils/jwt";
 import { tokenUtils } from "../../utils/token";
 import {
   IChangePasswordPayload,
+  IGoogleSession,
   ILoginUserPayload,
   IRegisterStudentPayload,
 } from "./auth.interface";
@@ -206,7 +207,7 @@ const getNewToken = async (refreshToken: string, sessionToken: string) => {
     },
     data: {
       token: sessionToken,
-      expiresAt: new Date(Date.now() + 60 * 60 * 60 * 24 * 1000),
+      expiresAt: new Date(Date.now() + 60 * 60 * 24 * 1000),
       updatedAt: new Date(),
     },
   });
@@ -388,8 +389,8 @@ const resetPassword = async (
   });
 };
 
-const googleLoginSuccess = async (session: Record<string, unknown>) => {
-  const user = session.user as { id: string; name: string; email: string; role: string };
+const googleLoginSuccess = async (session: IGoogleSession) => {
+  const user = session.user;
 
   const isStudentExists = await prisma.student.findUnique({
     where: {

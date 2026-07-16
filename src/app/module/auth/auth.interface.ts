@@ -13,3 +13,14 @@ export interface IChangePasswordPayload {
   currentPassword: string;
   newPassword: string;
 }
+
+export interface IGoogleSessionUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+export interface IGoogleSession {
+  user: IGoogleSessionUser;
+}

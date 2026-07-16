@@ -10,7 +10,7 @@ import { sendEmail } from "../../utils/email";
 import { paymentFilterableFields, paymentSearchableFields } from "./payment.constant";
 import { generateInvoicePdf } from "./payment.utils";
 
-const handlerStripeWebhookEvent = async (event: Stripe.Event) => {
+const handleStripeWebhookEvent = async (event: Stripe.Event) => {
   const existingPayment = await prisma.payment.findFirst({
     where: { stripeEventId: event.id },
   });
@@ -215,7 +215,7 @@ const getAllPayments = async (query: IQueryParams) => {
 };
 
 export const PaymentService = {
-  handlerStripeWebhookEvent,
+  handleStripeWebhookEvent,
   getMyPayments,
   getAllPayments,
 };

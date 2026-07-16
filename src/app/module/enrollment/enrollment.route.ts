@@ -1,13 +1,16 @@
 import { Router } from "express";
 import { UserRole } from "../../../generated/prisma/enums";
 import { checkAuth } from "../../middleware/checkAuth";
+import { validateRequest } from "../../middleware/validateRequest";
 import { EnrollmentController } from "./enrollment.controller";
+import { checkoutZodSchema } from "./enrollment.validation";
 
 const router = Router();
 
 router.post(
   "/checkout",
   checkAuth(UserRole.STUDENT),
+  validateRequest(checkoutZodSchema),
   EnrollmentController.checkoutCart,
 );
 

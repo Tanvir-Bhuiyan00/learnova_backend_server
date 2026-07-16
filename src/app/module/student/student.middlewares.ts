@@ -9,10 +9,8 @@ export const updateStudentProfileMiddleware = (
     req.body = JSON.parse(req.body.data);
   }
 
-  const files = req.files as { [fieldName: string]: Express.Multer.File[] } | undefined;
-
-  if (files?.profilePhoto?.[0]) {
-    req.body.profilePhoto = files.profilePhoto[0].path;
+  if (req.file) {
+    req.body.profilePhoto = req.file.path;
   }
 
   next();

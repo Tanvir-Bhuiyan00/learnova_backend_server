@@ -39,25 +39,32 @@ const generateCertificate = async (
     );
   }
 
-  const certificateUrl = await CertificateUtils.generateCertificatePDF({
-    studentName: student.name,
-    courseName: enrollment.course.title,
-    instructorName: enrollment.course.instructor.name,
-    issuedAt: new Date(),
-    certificateId: "", // will be updated after creation
-  });
-
   const result = await prisma.certificate.create({
     data: {
-      certificateUrl,
+      certificateUrl: "",
       studentId: student.id,
       courseId: enrollment.courseId,
       enrollmentId,
     },
   });
 
-  // Update the certificate ID in the PDF URL reference
-  return result;
+  try {
+    const certificateUrl = await CertificateUtils.generateCertificatePDF({
+      studentName: student.name,
+      courseName: enrollment.course.title,
+      instructorName: enrollment.course.instructor.name,
+      issuedAt: new Date(),
+      certificateId: result.id,
+    });
+
+    return await prisma.certificate.update({
+      where: { id: result.id },
+      data: { certificateUrl },
+    });
+  } catch (error) {
+    await prisma.certificate.delete({ where: { id: result.id } });
+    throw error;
+  }
 };
 
 const getMyCertificates = async (user: IRequestUser) => {

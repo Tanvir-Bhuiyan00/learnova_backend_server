@@ -8,5 +8,4 @@ export const enrollmentFilterableFields = [
   "studentId",
   "courseId",
   "isCompleted",
-  "status",
 ];

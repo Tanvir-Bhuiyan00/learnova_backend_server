@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import status from "http-status";
-import ms, { StringValue } from "ms";
 import { envVars } from "../../config/env";
 import AppError from "../../errorHelpers/AppError";
 import { auth } from "../../lib/auth";
@@ -11,11 +10,7 @@ import { tokenUtils } from "../../utils/token";
 import { AuthService } from "./auth.service";
 
 const registerStudent = catchAsync(async (req: Request, res: Response) => {
-  const maxAge = ms(envVars.ACCESS_TOKEN_EXPIRES_IN as StringValue);
-  console.log({ maxAge });
   const payload = req.body;
-
-  console.log(payload);
 
   const result = await AuthService.registerStudent(payload);
 
@@ -62,7 +57,6 @@ const loginUser = catchAsync(async (req: Request, res: Response) => {
 
 const getMe = catchAsync(async (req: Request, res: Response) => {
   const user = req.user;
-  console.log({ user });
   const result = await AuthService.getMe(user);
   sendResponse(res, {
     httpStatusCode: status.OK,

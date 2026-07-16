@@ -18,7 +18,10 @@ export const checkAuth =
       );
 
       if (!sessionToken) {
-        throw new Error("Unauthorized access! No session token provided.");
+        throw new AppError(
+          status.UNAUTHORIZED,
+          "Unauthorized access! No session token provided.",
+        );
       }
 
       if (sessionToken) {
@@ -82,14 +85,10 @@ export const checkAuth =
             role: user.role,
             email: user.email,
           };
-        }
-
-        const accessToken = CookieUtils.getCookie(req, "accessToken");
-
-        if (!accessToken) {
+        } else {
           throw new AppError(
             status.UNAUTHORIZED,
-            "Unauthorized access! No access token provided.",
+            "Unauthorized access! Invalid or expired session.",
           );
         }
       }
