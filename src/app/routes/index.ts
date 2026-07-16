@@ -7,6 +7,7 @@ import { CourseRoutes } from "../module/course/course.route";
 import { EnrollmentRoutes } from "../module/enrollment/enrollment.route";
 import { InstructorRoutes } from "../module/instructor/instructor.route";
 import { PaymentRoutes } from "../module/payment/payment.route";
+import { StudentRoutes } from "../module/student/student.route";
 import { UserRoutes } from "../module/user/user.route";
 
 const router = Router();
@@ -20,5 +21,6 @@ router.use("/instructors", InstructorRoutes);
 router.use("/carts", CartRoutes);
 router.use("/enrollments", EnrollmentRoutes);
 router.use("/payments", PaymentRoutes);
+router.use("/students", StudentRoutes);
 
 export const IndexRoutes = router;
