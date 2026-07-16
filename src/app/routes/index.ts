@@ -7,6 +7,11 @@ import { CourseRoutes } from "../module/course/course.route";
 import { EnrollmentRoutes } from "../module/enrollment/enrollment.route";
 import { InstructorRoutes } from "../module/instructor/instructor.route";
 import { PaymentRoutes } from "../module/payment/payment.route";
+import {
+  AttemptRoutes,
+  CourseQuizRoutes,
+  QuizRoutes,
+} from "../module/quiz/quiz.route";
 import { ReviewRoutes } from "../module/review/review.route";
 import { StatsRoutes } from "../module/stats/stats.route";
 import { StudentRoutes } from "../module/student/student.route";
@@ -18,6 +23,9 @@ router.use("/auth", AuthRoutes);
 router.use("/admins", AdminRoutes);
 router.use("/categories", CategoryRoutes);
 router.use("/courses", CourseRoutes);
+router.use("/courses", CourseQuizRoutes);
+router.use("/quizzes", QuizRoutes);
+router.use("/quiz-attempts", AttemptRoutes);
 router.use("/users", UserRoutes);
 router.use("/instructors", InstructorRoutes);
 router.use("/carts", CartRoutes);
