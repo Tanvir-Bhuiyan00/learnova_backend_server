@@ -12,6 +12,13 @@ export const seedSuperAdmin = async () => {
     });
 
     if (isSuperAdminExist) {
+      if (!isSuperAdminExist.emailVerified) {
+        await prisma.user.update({
+          where: { id: isSuperAdminExist.id },
+          data: { emailVerified: true },
+        });
+        console.log("Super admin email verified.");
+      }
       console.log("Super admin already exists. Skipping seeding super admin.");
       return;
     }

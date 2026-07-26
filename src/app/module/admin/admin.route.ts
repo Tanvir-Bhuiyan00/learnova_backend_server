@@ -11,6 +11,19 @@ import {
 
 const router = Router();
 
+router.patch(
+  "/change-user-status",
+  checkAuth(UserRole.SUPER_ADMIN, UserRole.ADMIN),
+  validateRequest(changeUserStatusZodSchema),
+  AdminController.changeUserStatus,
+);
+router.patch(
+  "/change-user-role",
+  checkAuth(UserRole.SUPER_ADMIN),
+  validateRequest(changeUserRoleZodSchema),
+  AdminController.changeUserRole,
+);
+
 router.get(
   "/",
   checkAuth(UserRole.ADMIN, UserRole.SUPER_ADMIN),
@@ -31,19 +44,6 @@ router.delete(
   "/:id",
   checkAuth(UserRole.SUPER_ADMIN),
   AdminController.deleteAdmin,
-);
-
-router.patch(
-  "/change-user-status",
-  checkAuth(UserRole.SUPER_ADMIN, UserRole.ADMIN),
-  validateRequest(changeUserStatusZodSchema),
-  AdminController.changeUserStatus,
-);
-router.patch(
-  "/change-user-role",
-  checkAuth(UserRole.SUPER_ADMIN),
-  validateRequest(changeUserRoleZodSchema),
-  AdminController.changeUserRole,
 );
 
 export const AdminRoutes = router;

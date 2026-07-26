@@ -132,7 +132,7 @@ const changeUserStatus = async (
 ) => {
   const isAdminExists = await prisma.admin.findUniqueOrThrow({
     where: {
-      email: user.email,
+      userId: user.userId,
     },
     include: {
       user: true,
