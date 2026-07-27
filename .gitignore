@@ -13,3 +13,4 @@ Learnova-Backend-Server.json
 
 vercel.json
 .vercel
+.env*.local
