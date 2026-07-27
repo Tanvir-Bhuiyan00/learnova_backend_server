@@ -12,6 +12,8 @@ import qs from "qs";
 import cron from "node-cron";
 import { PaymentController } from "./app/module/payment/payment.controller";
 import { EnrollmentService } from "./app/module/enrollment/enrollment.service";
+import { catchAsync } from "./app/shared/catchAsync";
+import { sendResponse } from "./app/shared/sendResponse";
 
 const app: Application = express();
 app.set("query parser", (str: string) => qs.parse(str));
@@ -49,17 +51,40 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 
-cron.schedule("*/25 * * * *", async () => {
-  try {
-    console.log("Running cron job to cancel unpaid enrollments...");
+if (process.env.NODE_ENV !== "production") {
+  cron.schedule("*/25 * * * *", async () => {
+    try {
+      console.log("Running cron job to cancel unpaid enrollments...");
+      await EnrollmentService.cancelUnpaidEnrollments();
+    } catch (error: any) {
+      console.error(
+        "Error occurred while canceling unpaid enrollments:",
+        error.message,
+      );
+    }
+  });
+}
+
+app.get(
+  "/api/v1/cron/cancel-unpaid-enrollments",
+  catchAsync(async (req, res) => {
+    if (
+      req.headers["authorization"] !== `Bearer ${process.env.CRON_SECRET}`
+    ) {
+      return sendResponse(res, {
+        success: false,
+        httpStatusCode: 401,
+        message: "Unauthorized",
+      });
+    }
     await EnrollmentService.cancelUnpaidEnrollments();
-  } catch (error: any) {
-    console.error(
-      "Error occurred while canceling unpaid enrollments:",
-      error.message,
-    );
-  }
-});
+    sendResponse(res, {
+      success: true,
+      httpStatusCode: 200,
+      message: "Cron job executed",
+    });
+  }),
+);
 
 app.use("/api/v1", IndexRoutes);
 
