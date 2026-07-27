@@ -11,6 +11,3 @@ AGENTS.md
 POSTMAN_GUIDE.md
 Learnova-Backend-Server.json
 
-vercel.json
-.vercel
-.env*.local
